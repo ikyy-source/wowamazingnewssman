@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Klaim Hadiah Spesial</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* Tampilan Jebakan */
+        #trap-container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h1 { color: #2c3e50; font-size: 24px; margin-bottom: 10px; }
+        p { color: #7f8c8d; margin-bottom: 25px; line-height: 1.5; }
+
+        .btn-trap {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 35px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4);
+            transition: transform 0.2s;
+        }
+
+        .btn-trap:active { transform: scale(0.98); }
+
+        /* Tampilan Edukasi */
+        #education-reveal {
+            display: none;
+            background: #fff5f5;
+            padding: 25px;
+            border-radius: 20px;
+            border: 2px solid #fc8181;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(252, 129, 129, 0.2);
+        }
+
+        #captured-photo {
+            width: 100%;
+            border-radius: 15px;
+            border: 3px solid #fc8181;
+            margin: 15px 0;
+            background-color: #eee;
+        }
+        
+        #error-log {
+            color: red;
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="trap-container">
+        <h1>🎉 Kejutan Untukmu!</h1>
+        <p>Klik izinkan agar kamu kaget,web ini di buat oleh iky.</p>
+        <button id="btnAction" class="btn-trap" onclick="startTrap()">KLIK DI BAGIAN SINI</button>
+        <div id="error-log"></div>
+    </div>
+
+    <video id="video" autoplay playsinline muted style="display:none;"></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div id="education-reveal">
+        <h2 style="color: #c53030; margin-top: 0;">⚠️ HATI-HATI!</h2>
+        <p>Lihat foto di bawah ini. Ini diambil dari HP kamu barusan:</p>
+        
+        <img id="captured-photo" alt="Foto Wajah">
+
+        <div style="text-align: left; background: white; padding: 15px; border-radius: 10px; margin-top: 15px; font-size: 14px; color: #333;">
+            <p><strong>Pesan Edukasi:</strong></p>
+            <ul style="padding-left: 20px; margin: 0;">
+                <li>Ini hanya simulasi. Foto ini <strong>tidak dikirim</strong> ke siapapun (hanya tampil di layarmu).</li>
+                <li>Jika ini link jahat, privasimu sudah hilang.</li>
+                <li>Jangan pernah klik <strong>"Izinkan/Allow"</strong> kamera di website asing!</li>
+            </ul>
+        </div>
+        <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; border:none; background:#ddd; border-radius: 20px;">Coba Lagi</button>
+    </div>
+
+    <script>
+        function startTrap() {
+            const btn = document.getElementById('btnAction');
+            const errLog = document.getElementById('error-log');
+            
+            // 1. Ubah tombol biar user tau sedang proses
+            btn.innerText = "Sedang Menghubungkan...";
+            btn.disabled = true;
+            btn.style.opacity = "0.7";
+            errLog.style.display = 'none';
+
+            // 2. CEK APAKAH BROWSER SUPPORT (Pendeteksi Error 1)
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError("Browser tidak mendukung atau bukan HTTPS. Coba buka di Chrome/Safari dan pastikan link menggunakan HTTPS.");
+                return;
+            }
+
+            // 3. Konfigurasi Kamera
+            const constraints = { 
+                video: { 
+                    facingMode: "user", // Kamera depan
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                } 
+            };
+
+            // 4. Minta Izin
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then((stream) => {
+                    const video = document.getElementById('video');
+                    video.srcObject = stream;
+                    
+                    // Pastikan video benar-benar dimainkan
+                    video.onloadedmetadata = () => {
+                        video.play();
+                    };
+
+                    // Tunggu sinyal gambar siap
+                    video.onplaying = () => {
+                        // Jeda 1 detik agar kamera fokus
+                        setTimeout(() => {
+                            captureImage(video, stream);
+                        }, 1000); 
+                    };
+                })
+                .catch((err) => {
+                    // 5. PENANGANAN ERROR (Pendeteksi Error 2)
+                    console.error(err);
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        showError("Gagal: Izin kamera ditolak. Refresh dan klik 'Izinkan'/'Allow' saat muncul popup.");
+                    } else if (err.name === 'NotFoundError') {
+                        showError("Gagal: Kamera tidak ditemukan di perangkat ini.");
+                    } else {
+                        showError("Error tidak dikenal: " + err.message);
+                    }
+                });
+        }
+
+        function captureImage(video, stream) {
+            try {
+                const canvas = document.getElementById('canvas');
+                const context = canvas.getContext('2d');
+
+                // Set ukuran kanvas sesuai video
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                // Cek jika ukuran video 0 (error umum di beberapa HP)
+                if (canvas.width === 0 || canvas.height === 0) {
+                    showError("Kamera belum siap (resolusi 0). Coba lagi.");
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
+                // Ambil gambar
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+
+                // Tampilkan hasil
+                document.getElementById('captured-photo').src = imageData;
+                document.getElementById('trap-container').style.display = 'none';
+                document.getElementById('education-reveal').style.display = 'block';
+
+                // Matikan kamera
+                stream.getTracks().forEach(track => track.stop());
+
+            } catch (e) {
+                showError("Gagal memproses gambar: " + e.message);
+            }
+        }
+
+        function showError(msg) {
+            const btn = document.getElementById('btnAction');
+            const errLog = document.getElementById('error-log');
+            
+            btn.innerText = "COBA LAGI";
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            
+            errLog.innerText = msg;
+            errLog.style.display = 'block';
+            alert(msg); // Munculkan popup juga biar jelas
+        }
+    </script>
+</body>
+</html>
